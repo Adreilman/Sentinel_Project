@@ -45,7 +45,24 @@ bot_rate_by_ip = df.groupby(["remote_host","minute_bucket"])["is_bot"].mean()
 features = features.join(bot_rate_by_ip.rename("bot_rate"))
 
 
+response_bytes_avg = df.groupby(["remote_host","minute_bucket"])["response_bytes_clf"].mean()
+response_bytes_total = df.groupby(["remote_host","minute_bucket"])["response_bytes_clf"].sum()
+features = features.join(response_bytes_avg.rename("response_bytes_avg"))
+features = features.join(response_bytes_total.rename("response_bytes_total"))
+
+
+# print(features["response_bytes_avg"].describe())
+# print(features["response_bytes_total"].describe())
+# print(features.sort_values("response_bytes_total", ascending=False).head(5)[["remote_host", "minute_bucket", "requests_per_minute", "response_bytes_total"]])
+# print(features.sort_values("response_bytes_total", ascending=False).tail(10)[["remote_host", "minute_bucket", "requests_per_minute", "response_bytes_total"]])
+
+method_diversity_per_ip = df.groupby(["remote_host","minute_bucket"])["request_method"].nunique()
+features = features.join(method_diversity_per_ip.rename("method_diversity"))
+
+print(features["method_diversity"].describe())
+
 features = features.reset_index()
 features.to_parquet("data/processed/features.parquet")
 check = pd.read_parquet("data/processed/features.parquet")
 print(check.shape)
+print(check.columns.tolist())
