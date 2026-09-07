@@ -29,7 +29,7 @@ malformed_summary = pd.DataFrame({
 
 
 unique_uas = df[df["request_header_user_agent"].notna()]["request_header_user_agent"].unique()
-bot_lookup = {ua: parse(ua).is_bot for ua in unique_uas}
+bot_lookup = {ua: parse(ua).is_bot  or  ("google" in ua.lower() or "applebot" in ua.lower()) for ua in unique_uas}
 df["is_bot"] = df["request_header_user_agent"].map(bot_lookup)
 
 features = pd.DataFrame({
