@@ -18,15 +18,14 @@ df["is_error"] = (df["status"]>=400)
 
 error_rate_by_ip = df.groupby(["remote_host"])["is_error"].mean()
 
-malformed_request_rate = df.groupby(["remote_host"])["malformed_request"].mean()
+malformed_request_rate = df.groupby(["remote_host","minute_bucket"])["malformed_request"].mean()
 
 request_count_by_ip = df.groupby("remote_host").size()
 
-malformed_summary = pd.DataFrame({
-    "malformed_rate": malformed_request_rate,
-    "request_count": request_count_by_ip
-})
-
+# malformed_summary = pd.DataFrame({
+#     "malformed_rate": malformed_request_rate,
+#     "request_count": request_count_by_ip
+# })
 
 unique_uas = df[df["request_header_user_agent"].notna()]["request_header_user_agent"].unique()
 bot_lookup = {ua: parse(ua).is_bot  or  ("google" in ua.lower() or "applebot" in ua.lower()) for ua in unique_uas}
@@ -60,6 +59,9 @@ method_diversity_per_ip = df.groupby(["remote_host","minute_bucket"])["request_m
 features = features.join(method_diversity_per_ip.rename("method_diversity"))
 
 print(features["method_diversity"].describe())
+
+print(features.loc["74.82.60.66"][["requests_per_minute", "malformed_rate"]])
+
 
 features = features.reset_index()
 features.to_parquet("data/processed/features.parquet")

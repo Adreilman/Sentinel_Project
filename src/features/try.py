@@ -1,2 +1,6 @@
-test_ua = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.75 Safari/537.36 Google Favicon"
-print("google" in test_ua.lower() or "applebot" in test_ua.lower())
+import pandas as pd
+
+df = pd.read_parquet("data/processed/parsed_logs.parquet")
+
+
+print(df[(df["malformed_request"]==True) & (df["remote_host"] == "74.82.60.66")][["remote_host","time_received_isoformat","request_method","request_url_path","status","response_bytes_clf","request_header_user_agent","malformed_request"]].head(10).to_string())

@@ -1,0 +1,14 @@
+IP	Why it's suspicious	Found via
+151.239.241.163	14 rotating UAs across multiple days, high volume (200-300 req/min), 0% bot-confirmed	Manual investigation, Stage 1
+2.188.27.28	559 req/min burst, 4 rotating UAs, normal-looking paths but spoofed browser identity	Original discovery, Stage 1
+5.78.190.233	Repeat offender, 220+ req/min across multiple minutes, Stage 1 combined rule	Stage 1
+91.99.30.32	Flagged 9 separate times, sustained high volume + UA rotation	Stage 1
+91.99.47.57	Flagged 9 separate times, sustained pattern across a single day	Stage 1
+172.20.2.174	Extreme z-scores (70+) across volume AND response bytes simultaneously, near-zero baseline	Stage 2
+91.99.72.15	Consistently high z-scores across volume, UA rotation, and response bytes	Stage 2
+104.222.32.84 / 104.222.32.94	High z-scores on response bytes (avg and total)	Stage 2
+195.181.168.181 / 195.181.169.141	High z-scores on UA rotation and response bytes	Stage 2
+217.219.76.102	Appeared independently in both Stage 1 and Stage 2 (cross-validated)	Stage 1 + Stage 2
+74.82.60.74 / 74.82.60.66 / 74.82.17.87 (the 74.82.x.x cluster)	Low malformed-rate but high volume — one buried protocol-mismatch request hidden in otherwise normal traffic	Phase 1/2 malformed_rate investigation
+
+

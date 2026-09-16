@@ -86,5 +86,8 @@ df["flag_response_bytes_total_zscore_anomaly"] = (df["response_bytes_total_zscor
 # print(flagged_total[["remote_host", "response_bytes_total", "response_bytes_total_mean", "response_bytes_total_std", "response_bytes_total_zscore"]].sort_values("response_bytes_total_zscore", ascending=False).head(10).to_string())
 
 
+print(df[df["remote_host"] == "72.52.125.78"][["minute_bucket", "requests_per_minute", "unique_uas_per_ip", "unique_paths_per_ip", "response_bytes_avg", "response_bytes_total", "rpm_zscore", "unique_uas_zscore", "response_bytes_avg_zscore", "response_bytes_total_zscore"]].sort_values("minute_bucket").to_string())
+
+
 df.to_parquet("data/processed/stage2_flags.parquet")
 print("\nSaved: data/processed/stage2_flags.parquet")
