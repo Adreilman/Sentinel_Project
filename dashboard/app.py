@@ -6,10 +6,6 @@ import plotly.graph_objects as go
 import streamlit as st
 
 
-# ============================================================
-# Sentinel Dashboard
-# ============================================================
-
 st.set_page_config(
     page_title="Sentinel | Cybersecurity Dashboard",
     page_icon="🛡️",
@@ -17,17 +13,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-
-# ------------------------------------------------------------
-# Paths
-# ------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = PROJECT_ROOT / "data" / "processed"
+DATA_DIR = PROJECT_ROOT / "dashboard" / "data"
 
 
-# ------------------------------------------------------------
-# Styling
-# ------------------------------------------------------------
 st.markdown(
     """
     <style>
@@ -35,30 +24,20 @@ st.markdown(
         padding-top: 1.5rem;
         padding-bottom: 2rem;
     }
-
     .sentinel-title {
         font-size: 2.4rem;
         font-weight: 800;
         margin-bottom: 0.2rem;
     }
-
     .sentinel-subtitle {
         color: #6b7280;
         font-size: 1rem;
         margin-bottom: 1.5rem;
     }
-
     [data-testid="stMetric"] {
         border: 1px solid rgba(128, 128, 128, 0.22);
         border-radius: 14px;
         padding: 1rem;
-        background: rgba(128, 128, 128, 0.035);
-    }
-
-    .status-card {
-        border: 1px solid rgba(128, 128, 128, 0.22);
-        border-radius: 14px;
-        padding: 1rem 1.2rem;
         background: rgba(128, 128, 128, 0.035);
     }
     </style>
@@ -67,68 +46,51 @@ st.markdown(
 )
 
 
-# ------------------------------------------------------------
-# Data loading
-# ------------------------------------------------------------
 def required_path(name: str) -> Path:
     path = DATA_DIR / name
+
     if not path.exists():
         raise FileNotFoundError(
-            f"Required file not found: {path}\n"
-            f"Run the Sentinel detection pipeline first."
+            f"Dashboard data file not found: {path}\n"
+            "Run src/analysis/prepare_dashboard_data.py first."
         )
+
     return path
 
 
-@st.cache_data(show_spinner="Loading Sentinel detection results...")
+@st.cache_data(show_spinner="Loading Sentinel dashboard data...")
 def load_final_detections() -> pd.DataFrame:
-    return pd.read_parquet(required_path("final_detections.parquet"))
+    return pd.read_parquet(
+        required_path("final_detections.parquet")
+    )
 
 
-@st.cache_data(show_spinner="Loading Sentinel behavioral features...")
+@st.cache_data(show_spinner="Loading Sentinel investigation data...")
 def load_features() -> pd.DataFrame:
-    return pd.read_parquet(required_path("features.parquet"))
-
-
-# ------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------
-def fmt_int(value) -> str:
-    try:
-        return f"{int(value):,}"
-    except (TypeError, ValueError):
-        return str(value)
-
-
-def fmt_pct(value) -> str:
-    return f"{float(value):.2f}%"
+    return pd.read_parquet(
+        required_path("features_dashboard.parquet")
+    )
 
 
 def normalize_boolean_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    for col in ["stage1_detected", "stage2_detected", "stage3_detected", "detected_in_any_stage"]:
+
+    for col in [
+        "stage1_detected",
+        "stage2_detected",
+        "stage3_detected",
+        "detected_in_any_stage",
+    ]:
         if col in df.columns:
             df[col] = df[col].fillna(False).astype(bool)
+
     return df
 
 
-# ------------------------------------------------------------
-# Load data
-# ------------------------------------------------------------
-try:
-    final_df = normalize_boolean_columns(load_final_detections())
-    features_df = load_features()
-except FileNotFoundError as exc:
-    st.error(str(exc))
-    st.stop()
-except Exception as exc:
-    st.error(f"Could not load Sentinel data: {exc}")
-    st.stop()
+final_df = normalize_boolean_columns(load_final_detections())
+features_df = load_features()
 
 
-# ------------------------------------------------------------
-# Current project metrics
-# ------------------------------------------------------------
 evaluation = {
     "Stage 1": {
         "Accuracy": 76.67,
@@ -161,21 +123,15 @@ evaluation = {
 }
 
 
-# ------------------------------------------------------------
-# Sidebar navigation
-# ------------------------------------------------------------
 st.sidebar.title("🛡️ Sentinel")
 st.sidebar.caption("Intelligent Cybersecurity Log Analytics & Anomaly Detection")
-
 page = st.sidebar.radio(
     "Navigation",
     ["Overview", "IP Investigation", "Detection Results", "Evaluation"],
 )
 
 st.sidebar.divider()
-st.sidebar.caption(
-    "Data source: final_detections.parquet + features.parquet"
-)
+st.sidebar.caption("Dashboard dataset: compact deployment subset")
 
 
 # ============================================================
@@ -183,7 +139,10 @@ st.sidebar.caption(
 # ============================================================
 if page == "Overview":
 
-    st.markdown('<div class="sentinel-title">Sentinel Dashboard</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sentinel-title">Sentinel Dashboard</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         '<div class="sentinel-subtitle">'
         "Multi-stage cybersecurity log analytics and anomaly detection"
@@ -193,44 +152,34 @@ if page == "Overview":
 
     total_ips = len(final_df)
     detected_ips = int(final_df["detected_in_any_stage"].sum())
-
-    if "detection_category" in final_df.columns:
-        all_stage_ips = int((final_df["detection_category"] == "all_stages").sum())
-    else:
-        all_stage_ips = int(
-            (
-                final_df[
-                    ["stage1_detected", "stage2_detected", "stage3_detected"]
-                ].all(axis=1)
-            ).sum()
-        )
-
     stage1_ips = int(final_df["stage1_detected"].sum())
     stage2_ips = int(final_df["stage2_detected"].sum())
     stage3_ips = int(final_df["stage3_detected"].sum())
 
+    all_stage_ips = int(
+        (final_df["detection_category"] == "all_stages").sum()
+    )
+
     c1, c2, c3, c4 = st.columns(4)
 
-    with c1:
-        st.metric("Total IPs Analyzed", fmt_int(total_ips))
-
-    with c2:
-        st.metric("IPs Detected", fmt_int(detected_ips))
-
-    with c3:
-        st.metric("All-Stage Detections", fmt_int(all_stage_ips))
-
-    with c4:
-        st.metric("Reference Suspicious Detected", "15 / 15")
-
-    st.subheader("Detection Stage Coverage")
+    c1.metric("Total IPs Analyzed", f"{total_ips:,}")
+    c2.metric("IPs Detected", f"{detected_ips:,}")
+    c3.metric("All-Stage Detections", f"{all_stage_ips:,}")
+    c4.metric("Reference Suspicious Detected", "15 / 15")
 
     coverage_df = pd.DataFrame(
         {
             "Stage": ["Stage 1", "Stage 2", "Stage 3", "Combined"],
-            "Detected IPs": [stage1_ips, stage2_ips, stage3_ips, detected_ips],
+            "Detected IPs": [
+                stage1_ips,
+                stage2_ips,
+                stage3_ips,
+                detected_ips,
+            ],
         }
     )
+
+    st.subheader("Detection Stage Coverage")
 
     fig = px.bar(
         coverage_df,
@@ -252,13 +201,20 @@ if page == "Overview":
     with left:
         st.subheader("Final Detection Categories")
 
-        category_order = ["none", "single_stage", "two_stages", "all_stages"]
+        category_order = [
+            "none",
+            "single_stage",
+            "two_stages",
+            "all_stages",
+        ]
+
         category_counts = (
             final_df["detection_category"]
             .value_counts()
             .reindex(category_order, fill_value=0)
             .reset_index()
         )
+
         category_counts.columns = ["Category", "IP Count"]
 
         fig = px.bar(
@@ -266,77 +222,53 @@ if page == "Overview":
             x="Category",
             y="IP Count",
             text="IP Count",
-            title="IP distribution by detection category",
         )
-        fig.update_traces(texttemplate="%{text:,}", textposition="outside")
+
+        fig.update_traces(
+            texttemplate="%{text:,}",
+            textposition="outside",
+        )
         fig.update_yaxes(tickformat=",")
         fig.update_layout(
             height=420,
-            margin=dict(l=20, r=20, t=60, b=20),
+            margin=dict(l=20, r=20, t=20, b=20),
             showlegend=False,
         )
         st.plotly_chart(fig, use_container_width=True)
 
     with right:
-        st.subheader("Current Reference Evaluation")
+        st.subheader("Evaluation Metrics")
 
         performance_rows = []
+
         for stage, metrics in evaluation.items():
-            performance_rows.append(
-                {
-                    "Stage": stage,
-                    "Accuracy": metrics["Accuracy"],
-                    "Precision": metrics["Precision"],
-                    "Recall": metrics["Recall"],
-                    "F1": metrics["F1"],
-                    "Specificity": metrics["Specificity"],
-                }
-            )
+            row = {"Stage": stage}
+            row.update(metrics)
+            performance_rows.append(row)
 
         perf_df = pd.DataFrame(performance_rows)
+
         fig = px.bar(
             perf_df,
             x="Stage",
-            y=["Accuracy", "Precision", "Recall", "F1", "Specificity"],
+            y=[
+                "Accuracy",
+                "Precision",
+                "Recall",
+                "F1",
+                "Specificity",
+            ],
             barmode="group",
-            title="Evaluation metrics",
             range_y=[0, 110],
         )
+
         fig.update_yaxes(title="Percentage (%)")
-        fig.update_layout(height=420, margin=dict(l=20, r=20, t=60, b=20))
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.subheader("Highly Corroborated Detections")
-
-    corroborated = final_df[
-        final_df["detection_stage_count"] >= 2
-    ].copy()
-
-    if not corroborated.empty:
-        cols = [
-            c
-            for c in [
-                "remote_host",
-                "stage1_detected",
-                "stage2_detected",
-                "stage3_detected",
-                "detection_stage_count",
-                "detection_category",
-                "anomaly_minutes",
-                "min_score",
-                "mean_score",
-            ]
-            if c in corroborated.columns
-        ]
-
-        st.dataframe(
-            corroborated.sort_values(
-                ["detection_stage_count", "mean_score"],
-                ascending=[False, True],
-            )[cols].head(50),
-            use_container_width=True,
-            hide_index=True,
+        fig.update_layout(
+            height=420,
+            margin=dict(l=20, r=20, t=20, b=20),
         )
+
+        st.plotly_chart(fig, use_container_width=True)
 
 
 # ============================================================
@@ -344,18 +276,19 @@ if page == "Overview":
 # ============================================================
 elif page == "IP Investigation":
 
-    st.markdown('<div class="sentinel-title">IP Investigation</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sentinel-title">IP Investigation</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         '<div class="sentinel-subtitle">'
-        "Inspect the behavioral timeline and detection stages for an individual IP"
+        "Inspect behavioral activity for a detected or reference IP"
         "</div>",
         unsafe_allow_html=True,
     )
 
-    default_ip = ""
     selected_ip = st.text_input(
         "Enter an IP address",
-        value=default_ip,
         placeholder="Example: 151.239.241.163",
     ).strip()
 
@@ -363,10 +296,12 @@ elif page == "IP Investigation":
         st.info("Enter an IP address to investigate.")
         st.stop()
 
-    ip_final = final_df[final_df["remote_host"].astype(str) == selected_ip]
+    ip_final = final_df[
+        final_df["remote_host"].astype(str) == selected_ip
+    ]
 
     if ip_final.empty:
-        st.warning("This IP is not present in final_detections.parquet.")
+        st.warning("This IP is not present in the dashboard dataset.")
         st.stop()
 
     ip_final = ip_final.iloc[0]
@@ -379,62 +314,60 @@ elif page == "IP Investigation":
 
     d1, d2, d3, d4 = st.columns(4)
 
-    with d1:
-        st.metric("Stage 1", "Detected" if ip_final["stage1_detected"] else "Not detected")
+    d1.metric(
+        "Stage 1",
+        "Detected" if ip_final["stage1_detected"] else "Not detected",
+    )
 
-    with d2:
-        st.metric("Stage 2", "Detected" if ip_final["stage2_detected"] else "Not detected")
+    d2.metric(
+        "Stage 2",
+        "Detected" if ip_final["stage2_detected"] else "Not detected",
+    )
 
-    with d3:
-        st.metric("Stage 3", "Detected" if ip_final["stage3_detected"] else "Not detected")
+    d3.metric(
+        "Stage 3",
+        "Detected" if ip_final["stage3_detected"] else "Not detected",
+    )
 
-    with d4:
-        st.metric("Category", str(ip_final["detection_category"]))
-
-    st.divider()
+    d4.metric("Category", str(ip_final["detection_category"]))
 
     s1, s2, s3, s4 = st.columns(4)
 
-    with s1:
-        st.metric(
-            "Detection Stage Count",
-            str(int(ip_final["detection_stage_count"])),
-        )
+    s1.metric(
+        "Detection Stage Count",
+        str(int(ip_final["detection_stage_count"])),
+    )
 
-    with s2:
-        anomaly_minutes = ip_final.get("anomaly_minutes", 0)
-        st.metric("Anomaly Minutes", fmt_int(anomaly_minutes))
+    anomaly_minutes = ip_final.get("anomaly_minutes", 0)
+    s2.metric("Anomaly Minutes", str(int(anomaly_minutes)))
 
-    with s3:
-        min_score = ip_final.get("min_score", None)
-        st.metric(
-            "Minimum IF Score",
-            "N/A" if pd.isna(min_score) else f"{float(min_score):.5f}",
-        )
+    min_score = ip_final.get("min_score", None)
+    s3.metric(
+        "Minimum IF Score",
+        "N/A" if pd.isna(min_score) else f"{float(min_score):.5f}",
+    )
 
-    with s4:
-        mean_score = ip_final.get("mean_score", None)
-        st.metric(
-            "Mean IF Score",
-            "N/A" if pd.isna(mean_score) else f"{float(mean_score):.5f}",
-        )
+    mean_score = ip_final.get("mean_score", None)
+    s4.metric(
+        "Mean IF Score",
+        "N/A" if pd.isna(mean_score) else f"{float(mean_score):.5f}",
+    )
 
     if ip_features.empty:
-        st.info("No IP-minute feature records are available for this IP.")
+        st.info(
+            "No retained minute-level feature rows are available for this IP."
+        )
         st.stop()
 
     if "minute_bucket" in ip_features.columns:
         ip_features = ip_features.sort_values("minute_bucket")
 
-    st.subheader("Behavioral Timeline")
+    st.subheader("Requests per Minute")
 
     if "requests_per_minute" in ip_features.columns:
-        chart_cols = ["minute_bucket", "requests_per_minute"] if "minute_bucket" in ip_features.columns else ["requests_per_minute"]
-        chart_df = ip_features[chart_cols].copy()
-
-        if "minute_bucket" in chart_df.columns:
+        if "minute_bucket" in ip_features.columns:
             fig = px.line(
-                chart_df,
+                ip_features,
                 x="minute_bucket",
                 y="requests_per_minute",
                 markers=True,
@@ -458,7 +391,11 @@ elif page == "IP Investigation":
         "method_diversity",
     ]
 
-    available = [c for c in metric_cols if c in ip_features.columns]
+    available = [
+        column
+        for column in metric_cols
+        if column in ip_features.columns
+    ]
 
     st.dataframe(
         ip_features[available],
@@ -472,11 +409,8 @@ elif page == "IP Investigation":
 # ============================================================
 elif page == "Detection Results":
 
-    st.markdown('<div class="sentinel-title">Detection Results</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="sentinel-subtitle">'
-        "Filter and inspect IP-level Sentinel detections"
-        "</div>",
+        '<div class="sentinel-title">Detection Results</div>',
         unsafe_allow_html=True,
     )
 
@@ -503,24 +437,23 @@ elif page == "Detection Results":
         final_df["detection_category"].isin(selected_categories)
     ].copy()
 
-    if selected_stages:
-        stage_columns = {
-            "Stage 1": "stage1_detected",
-            "Stage 2": "stage2_detected",
-            "Stage 3": "stage3_detected",
-        }
+    stage_columns = {
+        "Stage 1": "stage1_detected",
+        "Stage 2": "stage2_detected",
+        "Stage 3": "stage3_detected",
+    }
 
-        stage_mask = pd.Series(False, index=filtered.index)
+    if selected_stages:
+        mask = pd.Series(False, index=filtered.index)
 
         for stage in selected_stages:
-            stage_mask |= filtered[stage_columns[stage]]
+            mask |= filtered[stage_columns[stage]]
 
-        # For a useful investigation table, selected stages act as an OR filter.
-        filtered = filtered[stage_mask]
+        filtered = filtered[mask]
     else:
         filtered = filtered.iloc[0:0]
 
-    st.metric("Matching IPs", fmt_int(len(filtered)))
+    st.metric("Matching IPs", f"{len(filtered):,}")
 
     display_cols = [
         "remote_host",
@@ -534,19 +467,22 @@ elif page == "Detection Results":
         "mean_score",
     ]
 
-    available_cols = [c for c in display_cols if c in filtered.columns]
+    display_cols = [
+        column
+        for column in display_cols
+        if column in filtered.columns
+    ]
 
     if filtered.empty:
         st.info("No IPs match the selected filters.")
     else:
-        sort_col = (
-            "detection_stage_count"
-            if "detection_stage_count" in filtered.columns
-            else "remote_host"
+        filtered = filtered.sort_values(
+            "detection_stage_count",
+            ascending=False,
         )
 
         st.dataframe(
-            filtered.sort_values(sort_col, ascending=False)[available_cols].head(1000),
+            filtered[display_cols].head(1000),
             use_container_width=True,
             hide_index=True,
         )
@@ -557,9 +493,12 @@ elif page == "Detection Results":
 # ============================================================
 # EVALUATION
 # ============================================================
-elif page == "Evaluation":
+else:
 
-    st.markdown('<div class="sentinel-title">Evaluation</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sentinel-title">Evaluation</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         '<div class="sentinel-subtitle">'
         "Performance on the manually labeled reference set"
@@ -568,18 +507,18 @@ elif page == "Evaluation":
     )
 
     st.info(
-        "Reference set: 30 manually labeled IPs — 15 suspicious and 15 legitimate. "
-        "These metrics are not dataset-wide performance estimates."
+        "Reference set: 30 manually labeled IPs — 15 suspicious and "
+        "15 legitimate. These metrics are not dataset-wide performance estimates."
     )
 
-    performance_rows = []
+    rows = []
 
     for stage, metrics in evaluation.items():
         row = {"Stage": stage}
         row.update(metrics)
-        performance_rows.append(row)
+        rows.append(row)
 
-    performance_df = pd.DataFrame(performance_rows)
+    performance_df = pd.DataFrame(rows)
 
     st.dataframe(
         performance_df,

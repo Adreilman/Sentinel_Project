@@ -1,0 +1,5 @@
+
+# --- Dashboard deployment data ---
+!dashboard/data/
+!dashboard/data/*.parquet
+!dashboard/data/*.json

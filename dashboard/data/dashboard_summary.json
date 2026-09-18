@@ -1,0 +1,14 @@
+{
+  "total_ips": 258606,
+  "detected_ips": 18443,
+  "feature_investigation_ips": 18455,
+  "feature_rows_retained": 184481,
+  "final_detections_rows": 258606,
+  "source_features_rows": 812061,
+  "detection_categories": {
+    "none": 240163,
+    "single_stage": 17297,
+    "two_stages": 960,
+    "all_stages": 186
+  }
+}
