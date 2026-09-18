@@ -1059,21 +1059,20 @@ elif page == "Evaluation":
     # --------------------------------------------------------
     # Limitations
     # --------------------------------------------------------
-    st.subheader(
-        "Project Limitations"
-    )
+st.subheader("Project Limitations")
 
-    limitations = [
-        "Evaluation uses a manually labeled 30-IP reference set.",
-        "The dataset is not fully ground-truth labeled.",
-        "Metrics therefore do not represent dataset-wide performance.",
-        "Legitimate labels were manually established from observed request behavior.",
-        "Isolation Forest is unsupervised.",
-        "Detection thresholds were selected from dataset analysis and are not universal security thresholds.",
-    ]
+limitations = [
+    "Evaluation uses a manually labeled 30-IP reference set.",
+    "The dataset is not fully ground-truth labeled.",
+    "Metrics therefore do not represent dataset-wide performance.",
+    "Legitimate labels were manually established from observed request behavior.",
+    "bot_rate contains missing values in some records, including malformed-request records.",
+    "The bot/crawler classification used to calculate bot_rate is imperfect and may not always distinguish legitimate automated crawlers from suspicious automation.",
+    "Because of these bot_rate limitations, the feature was excluded from the initial Isolation Forest feature set.",
+    "Isolation Forest is unsupervised, so detected anomalies represent unusual behavior rather than confirmed attacks.",
+    "Detection thresholds were selected from analysis of this dataset and are not universal cybersecurity thresholds.",
+    "The IP-minute aggregation can hide individual request-level behavior.",
+]
 
-    for item in limitations:
-
-        st.write(
-            f"• {item}"
-        )
+for item in limitations:
+    st.write(f"• {item}")
