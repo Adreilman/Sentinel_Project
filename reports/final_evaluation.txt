@@ -1,0 +1,106 @@
+Sentinel Evaluation
+-------------------
+
+Reference set:
+15 suspicious IPs
+15 legitimate IPs
+30 total IPs
+
+SYSTEM ARCHITECTURE
+-------------------
+
+Apache Access Logs
+        ↓
+   Log Parsing
+        ↓
+ Feature Engineering
+        ↓
+ ┌─────────────────────────┐
+ │                         │
+ ▼                         ▼
+Stage 1                  Stage 2
+Rule-based               Statistical
+Detection                Baseline
+ │                         │
+ └──────────┬──────────────┘
+            ▼
+         Stage 3
+     Isolation Forest
+            │
+            ▼
+     Final Detection
+            │
+            ▼
+    IP-level Detection
+       & Categories
+            │
+            ▼
+     Evaluation Layer
+
+PERFORMANCE METRICS
+-------------------
+
+Stage 1
+Accuracy:    76.67%
+Precision:   83.33%
+Recall:      66.67%
+F1:          74.07%
+Specificity: 86.67%
+
+Stage 2
+Accuracy:    83.33%
+Precision:   85.71%
+Recall:      80.00%
+F1:          82.76%
+Specificity: 86.67%
+
+Stage 3
+Accuracy:    70.00%
+Precision:   87.50%
+Recall:      46.67%
+F1:          60.87%
+Specificity: 93.33%
+
+Combined
+Accuracy:    90.00%
+Precision:   83.33%
+Recall:      100.00%
+F1:          90.91%
+Specificity: 80.00%
+
+CONFUSION COUNTS
+----------------
+
+Stage 1
+TP: 10
+TN: 13
+FP: 2
+FN: 5
+
+Stage 2
+TP: 12
+TN: 13
+FP: 2
+FN: 3
+
+Stage 3
+TP: 7
+TN: 14
+FP: 1
+FN: 8
+
+Combined
+TP: 15
+TN: 12
+FP: 3
+FN: 0
+
+LIMITATIONS
+-----------
+
+• Evaluation uses a manually labeled 30-IP reference set.
+• The dataset is not fully ground-truth labeled.
+• Metrics therefore do not represent dataset-wide performance.
+• Legitimate labels were manually established from observed request behavior.
+• Isolation Forest is unsupervised.
+• Detection thresholds were selected from dataset analysis and are not universal security thresholds.

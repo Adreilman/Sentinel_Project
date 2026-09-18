@@ -467,3 +467,235 @@ print(
         "remote_host"
     ].to_list()
 )
+
+df = pd.read_parquet("data/processed/features.parquet")
+known_legitimate = pd.read_csv("data/reference/known_legitimate.csv")
+
+legit_ips = known_legitimate["remote_host"]
+
+print("Legitimate IPs found in features:")
+print(
+    df[df["remote_host"].isin(legit_ips)]["remote_host"]
+    .value_counts()
+)
+
+print("\nTotal legitimate IPs found:")
+print(
+    df[df["remote_host"].isin(legit_ips)]["remote_host"].nunique()
+)
+legit_stage1 = (
+    s1[s1["remote_host"].isin(legit_ips)]
+    .groupby("remote_host")
+    .apply(lambda x: (x["threat_tier"] != "none").any())
+)
+
+legit_stage2 = (
+    s2[s2["remote_host"].isin(legit_ips)]
+    .groupby("remote_host")
+    .apply(
+        lambda x: (
+            x["flag_rpm_anomaly"]
+            | x["flag_ua_zscore_anomaly"]
+            | x["flag_response_bytes_avg_zscore_anomaly"]
+            | x["flag_response_bytes_total_zscore_anomaly"]
+        ).any()
+    )
+)
+
+legit_stage3 = (
+    s3[s3["remote_host"].isin(legit_ips)]
+    .groupby("remote_host")["stage3_detected"]
+    .any()
+)
+
+legit_table = pd.DataFrame({
+    "remote_host": legit_ips
+})
+
+legit_table["stage1_detected"] = (
+    legit_table["remote_host"]
+    .map(legit_stage1)
+    .fillna(False)
+    .astype(bool)
+)
+
+legit_table["stage2_detected"] = (
+    legit_table["remote_host"]
+    .map(legit_stage2)
+    .fillna(False)
+    .astype(bool)
+)
+
+legit_table["stage3_detected"] = (
+    legit_table["remote_host"]
+    .map(legit_stage3)
+    .fillna(False)
+    .astype(bool)
+)
+
+print(legit_table.to_string(index=False))
+print("\nStage 1 false positives:", legit_table["stage1_detected"].sum())
+print("Stage 2 false positives:", legit_table["stage2_detected"].sum())
+print("Stage 3 false positives:", legit_table["stage3_detected"].sum())
+
+
+# =========================================================
+# BUILD LABELED EVALUATION SET
+# =========================================================
+
+suspect_eval = evaluation[
+    [
+        "remote_host",
+        "detected_in_stage1",
+        "detected_in_stage2",
+        "detected_in_stage3"
+    ]
+].copy()
+
+suspect_eval["actual_label"] = 1
+
+
+legit_eval = legit_table[
+    [
+        "remote_host",
+        "stage1_detected",
+        "stage2_detected",
+        "stage3_detected"
+    ]
+].copy()
+
+legit_eval = legit_eval.rename(
+    columns={
+        "stage1_detected": "detected_in_stage1",
+        "stage2_detected": "detected_in_stage2",
+        "stage3_detected": "detected_in_stage3"
+    }
+)
+
+legit_eval["actual_label"] = 0
+
+
+labeled_eval = pd.concat(
+    [suspect_eval, legit_eval],
+    ignore_index=True
+)
+
+
+# =========================================================
+# COMBINED DETECTOR
+# =========================================================
+
+labeled_eval["detected_in_any_stage"] = (
+    labeled_eval["detected_in_stage1"]
+    | labeled_eval["detected_in_stage2"]
+    | labeled_eval["detected_in_stage3"]
+)
+
+
+# =========================================================
+# METRIC CALCULATION
+# =========================================================
+
+def calculate_metrics(y_true, y_pred):
+
+    tp = ((y_true == 1) & (y_pred == 1)).sum()
+    tn = ((y_true == 0) & (y_pred == 0)).sum()
+    fp = ((y_true == 0) & (y_pred == 1)).sum()
+    fn = ((y_true == 1) & (y_pred == 0)).sum()
+
+    accuracy = (tp + tn) / (tp + tn + fp + fn)
+
+    precision = (
+        tp / (tp + fp)
+        if (tp + fp) > 0
+        else 0
+    )
+
+    recall = (
+        tp / (tp + fn)
+        if (tp + fn) > 0
+        else 0
+    )
+
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if (precision + recall) > 0
+        else 0
+    )
+
+    specificity = (
+        tn / (tn + fp)
+        if (tn + fp) > 0
+        else 0
+    )
+
+    return {
+        "TP": tp,
+        "TN": tn,
+        "FP": fp,
+        "FN": fn,
+        "Accuracy": accuracy,
+        "Precision": precision,
+        "Recall": recall,
+        "F1": f1,
+        "Specificity": specificity
+    }
+
+
+# =========================================================
+# CALCULATE FOR EACH STAGE
+# =========================================================
+
+stage1_metrics = calculate_metrics(
+    labeled_eval["actual_label"],
+    labeled_eval["detected_in_stage1"]
+)
+
+stage2_metrics = calculate_metrics(
+    labeled_eval["actual_label"],
+    labeled_eval["detected_in_stage2"]
+)
+
+stage3_metrics = calculate_metrics(
+    labeled_eval["actual_label"],
+    labeled_eval["detected_in_stage3"]
+)
+
+combined_metrics = calculate_metrics(
+    labeled_eval["actual_label"],
+    labeled_eval["detected_in_any_stage"]
+)
+
+
+# =========================================================
+# PRINT RESULTS
+# =========================================================
+
+metrics_table = pd.DataFrame({
+    "Stage 1": stage1_metrics,
+    "Stage 2": stage2_metrics,
+    "Stage 3": stage3_metrics,
+    "Combined": combined_metrics
+})
+
+print("\n=== CONFUSION / PERFORMANCE METRICS ===")
+
+print(metrics_table)
+
+
+print("\n=== PERCENTAGE METRICS ===")
+
+for name, metrics in {
+    "Stage 1": stage1_metrics,
+    "Stage 2": stage2_metrics,
+    "Stage 3": stage3_metrics,
+    "Combined": combined_metrics
+}.items():
+
+    print(f"\n{name}")
+    print(f"Accuracy:    {metrics['Accuracy']:.2%}")
+    print(f"Precision:   {metrics['Precision']:.2%}")
+    print(f"Recall:      {metrics['Recall']:.2%}")
+    print(f"F1:          {metrics['F1']:.2%}")
+    print(f"Specificity: {metrics['Specificity']:.2%}")
+
